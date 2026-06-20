@@ -220,6 +220,7 @@ variables:
       ancillary_variables: ' '
       comment: ' '
       long_name: glider heading angle
+      method: linear fill
       platform: platform
       precision: ' '
       resolution: ' '
@@ -242,6 +243,7 @@ variables:
       comment: Estimated between surface fixes
       coordinate_reference_frame: urn:ogc:crs:EPSG::4326
       long_name: latitude
+      method: linear fill
       observation_type: measured
       platform: platform
       precision: ' '
@@ -268,6 +270,7 @@ variables:
       comment: Estimated between surface fixes
       coordinate_reference_frame: urn:ogc:crs:EPSG::4326
       long_name: longitude
+      method: linear fill
       observation_type: measured
       platform: platform
       precision: ' '
@@ -312,6 +315,7 @@ variables:
       ancillary_variables: ' '
       comment: ' '
       long_name: glider pitch angle
+      method: linear fill
       platform: platform
       precision: ' '
       resolution: ' '
@@ -438,6 +442,7 @@ variables:
       ancillary_variables: ' '
       comment: ' '
       long_name: glider roll angle
+      method: linear fill
       platform: platform
       precision: ' '
       resolution: ' '
@@ -516,12 +521,21 @@ variables:
     n_nan: 0
     n_valid: 1167
     std: 12216309239400.0
+  trajectory:
+    attrs:
+      cf_role: trajectory_id
+      comment: A trajectory is a single deployment of a glider and may span multiple
+        data files.
+      long_name: Trajectory/Deployment Name
+    n_nan: 0
+    n_valid: 0
   waypoint_latitude:
     attrs:
       accuracy: ' '
       ancillary_variables: ' '
       comment: ' '
       long_name: waypoint latitude
+      method: linear fill
       platform: platform
       precision: ' '
       resolution: ' '
@@ -542,6 +556,7 @@ variables:
       ancillary_variables: ' '
       comment: ' '
       long_name: waypoint longitude
+      method: linear fill
       platform: platform
       precision: ' '
       resolution: ' '
