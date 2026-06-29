@@ -650,7 +650,7 @@ def nmea2deg(nmea):
     """
     Convert a NMEA float to a decimal degree float.  e.g. -12640.3232 = -126.6721
     """
-    deg = np.fix(nmea / 100) + np.sign(nmea) * np.remainder(np.abs(nmea), 100) / 60
+    deg = np.trunc(nmea / 100) + np.sign(nmea) * np.remainder(np.abs(nmea), 100) / 60
     return deg
 
 
@@ -1516,7 +1516,6 @@ def _any_newer(dirname, filename):
     """
     filename = Path(filename)
     dirname = Path(dirname)
-    print(filename, filename.exists())
     if not filename.exists():
         return True
 
@@ -1534,7 +1533,7 @@ def _any_newer(dirname, filename):
 def _get_glider_name_slocum(current_directory):
     glider = current_directory.parts[-2]
     mission = current_directory.parts[-1]
-    print(f'Glider {glider} and mission: {mission}')
+    _log.info(f'Glider {glider} and mission: {mission}')
     slocum_glider = glider[4:]
     if slocum_glider[-4:-3].isnumeric():
         slocum_glider = slocum_glider[:-4] + '_' + slocum_glider[-4:]
@@ -1834,7 +1833,7 @@ def flag_CTD_data(
         _log.info('Adding conductivity_QC variable to dataset')
 
         ts["conductivity_QC"] = xr.DataArray(
-            np.ones(ts["conductivity"].shape, dtype=int),
+            np.ones(ts["conductivity"].shape, dtype=np.int8),
             dims=ts["conductivity"].dims,
             coords=ts["conductivity"].coords,
         )
@@ -1842,7 +1841,7 @@ def flag_CTD_data(
     if "salinity_QC" not in ts.data_vars:
         _log.info('Adding salinity_QC variable to dataset')
         ts["salinity_QC"] = xr.DataArray(
-            np.ones(ts["salinity"].shape, dtype=int),
+            np.ones(ts["salinity"].shape, dtype=np.int8),
             dims=ts["salinity"].dims,
             coords=ts["salinity"].coords,
         )
@@ -1850,7 +1849,7 @@ def flag_CTD_data(
     if "temperature_QC" not in ts.data_vars:
         _log.info('Adding temperature_QC variable to dataset')
         ts["temperature_QC"] = xr.DataArray(
-            np.ones(ts["temperature"].shape, dtype=int),
+            np.ones(ts["temperature"].shape, dtype=np.int8),
             dims=ts["temperature"].dims,
             coords=ts["temperature"].coords,
         )
