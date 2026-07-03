@@ -90,7 +90,7 @@ known-first-party = ["pyglider"]
 [tool.pixi.workspace]
 name = "pyglider"
 channels = ["conda-forge"]
-platforms = ["osx-arm64"]
+platforms = ["osx-arm64", "linux-64"]
 
 [tool.pixi.pypi-dependencies]
 pyglider = { path = ".", editable = true }
