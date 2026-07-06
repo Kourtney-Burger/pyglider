@@ -94,18 +94,18 @@ platforms = ["osx-arm64", "linux-64"]
 
 [tool.pixi.pypi-dependencies]
 pyglider = { path = ".", editable = true }
-bitstring = "*"
+
+[tool.pixi.dependencies]
 dbdreader = "*"
+bitstring = "*"
 dask = "*"
 gsw = "*"
 netcdf4 = "*"
 numpy = "*"
 pooch = "*"
+polars = ">=1.1"
 scipy = "*"
 xarray = "*"
-polars = ">=1.1"
-
-[tool.pixi.dependencies]
 matplotlib = ">=3.11.0,<4"
 jupyterlab = ">=4.6.0,<5"
 ipykernel = ">=7.3.0,<8"
@@ -117,17 +117,15 @@ cc-plugin-glider = ">=2.2.1,<3"
 [tool.pixi.tasks]
 
 [tool.pixi.feature.test.dependencies]
+cc-plugin-og = "*"
 pytest = "*"
 pytest-cov = "*"
 compliance-checker = "*"
 
-[tool.pixi.feature.test.pypi-dependencies]
-cc-plugin-og = "*"
-
 [tool.pixi.feature.test.tasks]
 test = { cmd = "pytest" }
 
-[tool.pixi.feature.docs.pypi-dependencies]
+[tool.pixi.feature.docs.dependencies]
 sphinx = "*"
 pydata-sphinx-theme = "*"
 numpydoc = "*"

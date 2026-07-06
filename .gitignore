@@ -21,4 +21,5 @@ docs/_downloads/
 
 # pixi environments
 .pixi/*
+pixi.lock
 !.pixi/config.toml
