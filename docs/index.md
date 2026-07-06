@@ -19,7 +19,7 @@ pgplot.grid_plots(outname2, plottingyaml)
 
 Data comes from and is written in directories, and metadata is supplied by a yaml file.
 
-Currently only [Alseamar SeaExplorer](https://www.alseamar-alcen.com/products/underwater-glider/seaexplorer) and [Teledyne/Webb Slocum](http://www.teledynemarine.com/autonomous-underwater-gliders) glider data files are supported, and those with limited configurations. Other gliders will hopefully be added. If you have a glider type or configuration you would like added, [open an issue or pull request!](https://github.com/c-proof/pyglider).
+Currently only [Alseamar SeaExplorer](https://www.alseamar-alcen.com/products/underwater-glider/seaexplorer) and [Teledyne/Webb Slocum](https://www.teledynemarine.com/brands/webb-research/slocum-glider) glider data files are supported, and those with limited configurations. Other gliders will hopefully be added. If you have a glider type or configuration you would like added, [open an issue or pull request!](https://github.com/c-proof/pyglider).
 
 ```{toctree}
 ---
