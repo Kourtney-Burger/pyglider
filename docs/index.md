@@ -19,7 +19,7 @@ pgplot.grid_plots(outname2, plottingyaml)
 
 Data comes from and is written in directories, and metadata is supplied by a yaml file.
 
-Currently only [Alseamar SeaExplorer](https://www.alseamar-alcen.com/products/underwater-glider/seaexplorer) and [Teledyne/Webb Slocum](http://www.teledynemarine.com/autonomous-underwater-gliders) glider data files are supported, and those with limited configurations. Other gliders will hopefully be added. If you have a glider type or configuration you would like added, [open an issue or pull request!](https://github.com/c-proof/pyglider).
+Currently only [Alseamar SeaExplorer](https://www.alseamar-alcen.com/products/underwater-glider/seaexplorer) and [Teledyne/Webb Slocum](https://www.teledynemarine.com/brands/webb-research/slocum-glider) glider data files are supported, and those with limited configurations. Other gliders will hopefully be added. If you have a glider type or configuration you would like added, [open an issue or pull request!](https://github.com/c-proof/pyglider).
 
 ```{toctree}
 ---
@@ -28,15 +28,17 @@ maxdepth: 1
 Install
 getting-started-seaexplorer
 getting-started-slocum
+og10-yaml
 pyglider/pyglider
-
+adjust_CTD
+development
 ```
 
 ## Acknowledgements
 
-- Slocum binary translator based on
-  <https://gitlab.oceantrack.org/ocean-gliders-canada/dinkum/tree/seabBranch_py3>
-- Processing steps closely follow the work by SOCIB
-  <https://github.com/socib/glider_toolbox>
+- [dbdreader](https://dbdreader.readthedocs.io/en/latest/) is used to read Slocum binary files
+- Processing steps closely follow the work by SOCIB <https://github.com/socib/glider_toolbox>
 - Rutger's description of the Slocum binary files is very helpful: <https://github.com/kerfoot/spt/wiki/Slocum-Glider-Data-File-Primer>
 - The metadata format for NGDAC is here: <https://ioos.github.io/ioosngdac>
+- OG 1.0 data format is: <https://oceangliderscommunity.github.io/OG-format-user-manual/OG_Format.html>
+- CF compliance is checked with the [compliance-checker](https://github.com/ioos/compliance-checker) package, and the OG 1.0 compliance is checked with the [OG-format-compliance-checker](https://github.com/uw-farlab/cc-plugin-og) plugin.

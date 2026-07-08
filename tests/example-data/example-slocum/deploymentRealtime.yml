@@ -67,6 +67,10 @@ glider_devices:
     calibration_date: " "
     calibration_report: " "
     comment:   " "
+    Thermal_lag_constants_[alpha,tau]: [0.2, 2]
+    dTdC: 0
+    comment: 'Constants for ctd_9507 are found using dfo-rosie713-20230810. A detailed report of how the constants are defined can be found on https://cproof.uvic.ca. There is no lag between temperature and conductivity.'
+
   optics:
     make: Wetlabs
     model: FLBBCDSLC
@@ -122,18 +126,21 @@ netcdf_variables:
     long_name:    glider heading angle
     standard_name: platform_orientation
     units:        degrees
+    coordinates:  time latitude longitude depth
 
   pitch:
     source:  m_pitch
     long_name:    glider pitch angle
     standard_name: platform_pitch_angle
     units:        degrees
+    coordinates:  time latitude longitude depth
 
   roll:
     source:  m_roll
     long_name:    glider roll angle
     standard_name: platform_roll_angle
     units:        degrees
+    coordinates:  time latitude longitude depth
 
   # profile info:
   waypoint_latitude:
@@ -161,6 +168,7 @@ netcdf_variables:
     accuracy:      0.0003
     precision:     0.0001
     resolution:     0.00002
+    coordinates:   time latitude longitude depth
 
   temperature:
     source:  sci_water_temp
@@ -174,6 +182,7 @@ netcdf_variables:
     accuracy:      0.002
     precision:     0.001
     resolution:    0.0002
+    coordinates:   time latitude longitude depth
 
   pressure:
     source:  sci_water_pressure
@@ -191,6 +200,7 @@ netcdf_variables:
     precision:        2.0
     resolution:       0.02
     comment:          "ctd pressure sensor"
+    coordinates:      time latitude longitude depth
 
 
 # optics:
@@ -199,16 +209,19 @@ netcdf_variables:
     long_name:    chlorophyll
     standard_name: concentration_of_chlorophyll_in_sea_water
     units:        mg m-3
+    coordinates:  time latitude longitude depth
 
   cdom:
     source:  sci_flbbcd_cdom_units
     long_name:    CDOM
     units:        ppb
+    coordinates:  time latitude longitude depth
 
   backscatter_700:
     source:  sci_flbbcd_bb_units
     long_name:    700 nm wavelength backscatter
     units:         "1"
+    coordinates:  time latitude longitude depth
 
 # Oxygen
   oxygen_concentration:
@@ -216,6 +229,7 @@ netcdf_variables:
     long_name:    oxygen concentration
     standard_name: mole_concentration_of_dissolved_molecular_oxygen_in_sea_water
     units:        umol l-1
+    coordinates:  time latitude longitude depth
 
 # derived water speed:
   # water_velocity_eastward:
@@ -339,3 +353,76 @@ profile_variables:
     platform:            platform
     serial_number:       "9446"
     type:                platform
+  conductivity_QC:
+    average_method: 'QC_protocol'
+    comment: 'QC_protocol is a method of averaging that takes into account the 
+      quality flags of the data. It is used to ensure that only good data is 
+      used in the average.'
+    flags:   "1 = good data; 3 = bad data, potentially correctable; 4 = bad data;
+      8 = estimated data"
+
+  temperature_QC:
+    average_method: 'QC_protocol'
+    comment: 'QC_protocol is a method of averaging that takes into account the 
+      quality flags of the data. It is used to ensure that only good data is used 
+      in the average.'
+    flags:   "1 = good data; 3 = bad data, potentially correctable; 4 = bad data;
+     8 = estimated data"
+
+  salinity_QC:
+    average_method: 'QC_protocol'
+    comment: 'QC_protocol is a method of averaging that takes into account the 
+      quality flags of the data. It is used to ensure that only good data is used 
+      in the average.'
+    flags:   "1 = good data; 3 = bad data, potentially correctable; 4 = bad data;
+      8 = estimated data"
+
+  density_QC:
+    average_method: 'QC_protocol'
+    comment: 'QC_protocol is a method of averaging that takes into account the 
+      quality flags of the data. It is used to ensure that only good data is used 
+      in the average.'
+    flags:   "1 = good data; 3 = bad data, potentially correctable; 4 = bad data;
+      8 = estimated data"
+
+  potential_temperature_adjusted_QC:
+    average_method: 'QC_protocol' 
+    comment: 'QC_protocol is a method of averaging that takes into account the
+     quality flags of the data. It is used to ensure that only good data is used 
+     in the average.'
+    flags:   "1 = good data; 3 = bad data, potentially correctable; 4 = bad data; 
+      8 = estimated data"
+
+  potential_density_adjusted_QC:
+    average_method: 'QC_protocol'
+    comment: 'QC_protocol is a method of averaging that takes into account the
+     quality flags of the data. It is used to ensure that only good data is used 
+     in the average.'
+    flags:   "1 = good data; 3 = bad data, potentially correctable; 4 = bad data;
+     8 = estimated data"
+
+  temperature_adjusted_QC:
+    average_method: 'QC_protocol'
+    comment: 'QC_protocol is a method of averaging that takes into account the 
+      quality flags of the data. It is used to ensure that only good data is used 
+      in the average.'
+    flags:   "1 = good data; 3 = bad data, potentially correctable; 4 = bad data; 
+      8 = estimated data"
+
+  salinity_adjusted_QC:
+    long_name: 'Adjusted salinity QC flags'
+    average_method: 'QC_protocol'
+    comment: 'QC_protocol is a method of averaging that takes into account the
+      quality flags of the data. It is used to ensure that only good data is used
+      in the average.' 
+    flags:   "1 = good data; 3 = bad data, potentially
+      correctable; 4 = bad data; 8 = estimated data"
+
+  backscatter_700_QC:
+    long_name: 'Backscatter 700nm QC flags'
+    average_method: 'QC_protocol'
+    comment: 'QC_protocol is a method of averaging that takes into account the 
+      quality flags of the data. It is used to ensure that only good data is used
+     in the average.'
+    flags:   "1 = good data; 3 = bad data, potentially correctable; 4 = bad data;
+     8 = estimated data"

@@ -9,7 +9,13 @@ import os
 import netCDF4
 import numpy as np
 import scipy.stats as stats
+from scipy import signal
 import xarray as xr
+import gsw
+import yaml
+from datetime import date
+
+
 
 import pyglider.utils as utils
 
@@ -64,7 +70,7 @@ def extract_timeseries_profiles(inname, outdir, deploymentyaml, force=False):
                 dss['trajectory'].attrs['long_name'] = 'Trajectory/Deployment Name'
 
                 # profile-averaged variables....
-                profile_meta = deployment['profile_variables']
+                profile_meta = deployment.get('profile_variables', {})
                 if 'water_velocity_eastward' in dss.keys():
                     dss['u'] = dss.water_velocity_eastward.mean()
                     dss['u'].attrs = profile_meta['u']
@@ -165,6 +171,9 @@ def extract_timeseries_profiles(inname, outdir, deploymentyaml, force=False):
                     del dss.profile_time.attrs['units']
                 except KeyError:
                     pass
+                # CF §2.5.1: coordinate variables must not have _FillValue
+                dss['time'].encoding.pop('_FillValue', None)
+                dss['time'].attrs.pop('_FillValue', None)
                 dss.to_netcdf(
                     outname,
                     encoding={
@@ -172,6 +181,7 @@ def extract_timeseries_profiles(inname, outdir, deploymentyaml, force=False):
                             'units': timeunits,
                             'calendar': timecalendar,
                             'dtype': 'float64',
+                            '_FillValue': False,
                         },
                         'profile_time': {
                             'units': timeunits,
@@ -182,19 +192,24 @@ def extract_timeseries_profiles(inname, outdir, deploymentyaml, force=False):
                 )
 
                 # add traj_strlen using bare ntcdf to make IOOS happy
+                # also remove _FillValue from time (CF §2.5.1: coordinate
+                # variables must not have _FillValue)
                 with netCDF4.Dataset(outname, 'r+') as nc:
                     nc.renameDimension('string%d' % trajlen, 'traj_strlen')
+                    nc.variables['time'].delncattr('_FillValue')
 
 
 def make_gridfiles(
-    inname, 
-    outdir, 
-    deploymentyaml, 
-    *, 
-    fnamesuffix='', 
-    depth_bins=None, 
-    dz=1, 
-    starttime='1970-01-01', 
+    inname,
+    outdir,
+    deploymentyaml,
+    *,
+    fnamesuffix='',
+    depth_bins=None,
+    dz=1,
+    starttime='1970-01-01',
+    maskfunction=None,
+    max_gap=100,
 ):
     """
     Turn a timeseries netCDF file into a vertically gridded netCDF.
@@ -213,37 +228,61 @@ def make_gridfiles(
 
     depth_bins : array, default = None
         User-defined depth bins, for instance ``np.arange(0, 1000.1, 1)``.
-        If not None, these are the depth bins into which the data will be 
+        If not None, these are the depth bins into which the data will be
         gridded.  If None, ``dz`` is used to generate bins between 0 and 1100m
 
     dz : float, default = 1
-        Vertical grid spacing in meters.  Ignored if ``depth_bins`` is not None
+        Vertical grid spacing in meters.
 
-    Returns
+    maskfunction : callable or None, optional
+        Function applied to the dataset before gridding,
+        usually to choose what data will be set to NaN based on quality flags.
+
+    max_gap : int, default = 100
+        Maximum number of consecutive NaN values to fill when interpolating.  This is used to
+        prevent interpolation across large gaps in the data.
     -------
     outname : str
-        Name of gridded netCDF file.  The gridded netCDF file has dimensions of
+        Name of gridded netCDF file. The gridded netCDF file has coordinates of
         'depth' and 'profile', so each variable is gridded in depth bins and by
-        profile number.  Each profile has a time, latitude, and longitude. 
-        The depth values are the bin centers
+        profile number.  Each profile has a time, latitude, and longitude.
+        If deploymentyaml is a list, data is parsed for deployment information,
+        with subsequent files overwriting previous files.
+
+    Note:
+    By default, the arithmetic mean is used to bin all variables, except for those with
+    an average_method attribute inherited from the timeseries. This attribute is specified
+    in the YAML configuration file when the timeseries is created. For example, if a variable
+    has average_method: geometric mean, the geometric mean is used when gridding that variable.
+    Variables with average_method: QC_protocol are treated as discrete quality flags rather than
+    continuous data, and the maximum flag within each bin is used for gridding (e.g., if any
+    value in a bin is QC3, the gridded bin is assigned QC3).
     """
     try:
         os.mkdir(outdir)
     except FileExistsError:
         pass
-
     deployment = utils._get_deployment(deploymentyaml)
+    profile_meta = deployment.get('profile_variables', {})
+    varnames = utils._get_varnames(deployment)
 
-    profile_meta = deployment['profile_variables']
+    ds = utils._load_dataset(inname)
 
-    ds = xr.open_dataset(inname, decode_times=True)
-    ds = ds.where(ds.time > np.datetime64(starttime), drop=True)
+    depth_varname = utils._resolve_role(ds, varnames, 'depth')
+    profile_index_varname = utils._resolve_role(ds, varnames, 'profile_index')
+    lat_varname = utils._resolve_role(ds, varnames, 'latitude')
+    lon_varname = utils._resolve_role(ds, varnames, 'longitude')
+
+    if maskfunction is not None:
+        ds = maskfunction(ds)
+
+    ds = ds.sel(time=slice(np.datetime64(starttime), None))
     _log.info(f'Working on: {inname}')
     _log.debug(str(ds))
     _log.debug(str(ds.time[0]))
     _log.debug(str(ds.time[-1]))
 
-    profiles = np.unique(ds.profile_index)
+    profiles = np.unique(ds[profile_index_varname])
     profiles = [p for p in profiles if (~np.isnan(p) and not (p % 1) and (p > 0))]
     profile_bins = np.hstack((np.array(profiles) - 0.5, [profiles[-1] + 0.5]))
     _log.debug(profile_bins)
@@ -256,7 +295,7 @@ def make_gridfiles(
     else:
         # sanity check user-provided bins
         if (
-            depth_bins.ndim != 1 
+            depth_bins.ndim != 1
             or not np.all(np.isfinite(depth_bins))
             or not np.issubdtype(depth_bins.dtype, np.number)
         ):
@@ -265,93 +304,104 @@ def make_gridfiles(
             raise ValueError('There must be at least two depth bins edges')
         if not np.all(np.diff(depth_bins) > 0):
             raise ValueError('Depth bin edges must be strictly increasing and non-overlapping')
-    
+
     # calculate bin centers
     depths = 0.5*(depth_bins[:-1] + depth_bins[1:])
     _log.debug(f'depth bins and centers {depth_bins} {{depths}}')
 
     xdimname = 'time'
     dsout = xr.Dataset(
-        coords={'depth': ('depth', depths), 'profile': (xdimname, profiles)}
+        coords={depth_varname: (depth_varname, depths), 'profile': (xdimname, profiles)}
     )
-    dsout['depth'].attrs = {
+    dsout[depth_varname].attrs = {
         'units': 'm',
         'long_name': 'Depth',
         'standard_name': 'depth',
         'positive': 'down',
-        'source': ds.depth.attrs["source"], 
+        'source': ds[depth_varname].attrs.get('source', ''),
         'coverage_content_type': 'coordinate',
         'comment': 'center of depth bins',
     }
 
     # Bin by profile index, for the mean time, lat, and lon values for each profile
-    ds['time_1970'] = ds.temperature.copy()
-    ds['time_1970'].values = ds.time.values.astype(np.float64)
-    for td in ('time_1970', 'longitude', 'latitude'):
-        good = np.where(~np.isnan(ds[td]) & (ds['profile_index'] % 1 == 0))[0]
-        dat, xedges, binnumber = stats.binned_statistic(
-            ds['profile_index'].values[good],
-            ds[td].values[good],
-            statistic='mean',
-            bins=[profile_bins],
-        )
-        if td == 'time_1970':
-            td = 'time'
-            dat = dat.astype('timedelta64[ns]') + np.datetime64('1970-01-01T00:00:00')
+    ds['time_1970'] = xr.DataArray(
+        ds.time.values.astype(np.float64), dims=['time'], attrs={}
+    )
+
+    for td in ('time_1970', lon_varname, lat_varname):
+
+        good = np.where(~np.isnan(ds[td]) & (ds[profile_index_varname] % 1 == 0))[0]
+        if len(good) > 1:
+            dat, xedges, binnumber = stats.binned_statistic(
+                ds[profile_index_varname].values[good],
+                ds[td].values[good],
+                statistic='mean',
+                bins=[profile_bins],
+            )
+            if td == 'time_1970':
+                td = 'time'
+                dat = dat.astype('timedelta64[ns]') + np.datetime64('1970-01-01T00:00:00')
+        else:
+            dat = np.full(len(profiles), np.nan)
+            _log.info(f'Only {len(good)} good values for {td}, filling with NaN')
         _log.info(f'{td} {len(dat)}')
         dsout[td] = (('time'), dat, ds[td].attrs)
 
     # Bin by profile index, for the profile start (min) and end (max) times
     profile_lookup = {'profile_time_start': "min", 'profile_time_end': "max"}
-    good = np.where(~np.isnan(ds['time']) & (ds['profile_index'] % 1 == 0))[0]
+    good = np.where(~np.isnan(ds['time']) & (ds[profile_index_varname] % 1 == 0))[0]
     for td, bin_stat in profile_lookup.items():
         _log.debug(f'td, bin_stat {td}, {bin_stat}')
         dat, xedges, binnumber = stats.binned_statistic(
-            ds['profile_index'].values[good],
+            ds[profile_index_varname].values[good],
             ds['time_1970'].values[good],
             statistic=bin_stat,
             bins=[profile_bins],
         )
         dat = dat.astype('timedelta64[ns]') + np.datetime64('1970-01-01T00:00:00')
         _log.info(f'{td} {len(dat)}')
-        dsout[td] = ((xdimname), dat, profile_meta[td])
+        dsout[td] = ((xdimname), dat, profile_meta.get(td, {}))
 
-    ds = ds.drop('time_1970')
+    ds = ds.drop_vars('time_1970')
     _log.info(f'Done times!')
 
+
+    skip_vars = {'time', lat_varname, lon_varname, depth_varname, profile_index_varname}
     for k in ds.keys():
-        if k in ['time', 'profile', 'longitude', 'latitude', 'depth'] or 'time' in k:
+        if k in skip_vars or 'time' in k:
+            continue
+        if not np.issubdtype(ds[k].dtype, np.number):
             continue
         _log.info('Gridding %s', k)
-        good = np.where(~np.isnan(ds[k]) & (ds['profile_index'] % 1 == 0))[0]
+        good = np.where(~np.isnan(ds[k]) & (ds[profile_index_varname] % 1 == 0))[0]
         if len(good) <= 0:
             continue
-        if 'average_method' in ds[k].attrs:
-            average_method = ds[k].attrs['average_method']
-            ds[k].attrs['processing'] = (
-                f'Using average method {average_method} for '
-                f'variable {k} following deployment yaml.'
-            )
-            if average_method == 'geometric mean':
-                average_method = stats.gmean
-                ds[k].attrs['processing'] += (
-                    ' Using geometric mean implementation ' 'scipy.stats.gmean'
-                )
+        if 'QC_protocol' in ds[k].attrs.values():
+            method = np.nanmax
         else:
-            average_method = 'mean'
+            if 'average_method' in ds[k].attrs.values():
+                method = ds[k].attrs['average_method']
+                if method == 'geometric mean':
+                    method = stats.gmean
+            else:
+                method = 'mean'
+
         dat, xedges, yedges, binnumber = stats.binned_statistic_2d(
-            ds['profile_index'].values[good],
-            ds['depth'].values[good],
+            ds[profile_index_varname].values[good],
+            ds[depth_varname].values[good],
             values=ds[k].values[good],
-            statistic=average_method,
+            statistic=method,
             bins=[profile_bins, depth_bins],
         )
 
         _log.debug(f'dat{np.shape(dat)}')
-        dsout[k] = (('depth', xdimname), dat.T, ds[k].attrs)
+        dsout[k] = ((depth_varname, xdimname), dat.T, ds[k].attrs)
 
-        # fill gaps in data:
-        dsout[k].values = utils.gappy_fill_vertical(dsout[k].values)
+        dsout[k] = dsout[k].interpolate_na(
+            dim=depth_varname,
+            method="linear",
+            max_gap=max_gap,
+        )
 
     # fix u and v, because they should really not be gridded...
     if ('water_velocity_eastward' in dsout.keys()) and ('u' in profile_meta.keys()):
@@ -379,13 +429,10 @@ def make_gridfiles(
     except:
         pass
     # remove, so they can be encoded later:
-    try:
-        dsout['profile_time_start'].attrs.pop('units')
-        dsout['profile_time_end'].attrs.pop('units')
-        dsout['profile_time_start'].attrs.pop('_FillValue')
-        dsout['profile_time_end'].attrs.pop('_FillValue')
-    except:
-        pass
+    for var in ['time', 'profile_time_start', 'profile_time_end']:
+        if var in dsout:
+            for attr in ['units', 'calendar', '_FillValue']:
+                dsout[var].attrs.pop(attr, None)
 
     # set some attributes for cf guidance
     # see H.6.2. Profiles along a single trajectory
@@ -394,9 +441,9 @@ def make_gridfiles(
     dsout['profile'].attrs['cf_role'] = 'profile_id'
     dsout['mission_number'] = np.int32(1)
     dsout['mission_number'].attrs['cf_role'] = 'trajectory_id'
-    dsout = dsout.set_coords(['latitude', 'longitude', 'time'])
+    dsout = dsout.set_coords([lat_varname, lon_varname, 'time'])
     for k in dsout:
-        if k in ['profile', 'depth', 'latitude', 'longitude', 'time', 'mission_number']:
+        if k in ['profile', depth_varname, lat_varname, lon_varname, 'time', 'mission_number']:
             dsout[k].attrs['coverage_content_type'] = 'coordinate'
         else:
             dsout[k].attrs['coverage_content_type'] = 'physicalMeasurement'
@@ -413,16 +460,16 @@ def make_gridfiles(
     dsout.to_netcdf(
         outname,
         encoding={
-            'time': time_encoding, 
-            'profile_time_start': time_encoding, 
-            'profile_time_end': time_encoding, 
+            'time': {**time_encoding, '_FillValue': False},
+            'profile_time_start': time_encoding,
+            'profile_time_end': time_encoding,
         },
     )
     _log.info('Done gridding')
 
     return outname
 
-
+    _log.info('Done gridding')
 # aliases
 extract_L0timeseries_profiles = extract_timeseries_profiles
 make_L0_gridfiles = make_gridfiles

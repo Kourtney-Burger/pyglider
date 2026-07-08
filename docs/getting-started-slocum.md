@@ -6,7 +6,18 @@ Slocum gliders have 4 types of files. For telemetry data there are `*.tbd` files
 
 Slocum gliders also have a sensor cache file `*.cac`, all of which have randomized names. These are needed by the processing, and are usually stored in a separate cache directory.
 
-You can download example data at <https://cproof.uvic.ca/pyglider-example-data/pyglider-example-data.zip> which will add a local directory `example-data` to your current directory.
+You can download example data as a tarball from this documentation site:
+[example-data.tar.gz](https://pyglider.readthedocs.io/en/stable/example-data.tar.gz)
+
+Extract it with `tar xzf example-data.tar.gz`, which will add a local directory `example-data` to your current directory.
+
+Alternatively, use the Python helper (requires `pooch`):
+
+```python
+import pyglider.example_data as pexamp
+
+pexamp.get_example_data('./')
+```
 
 ## Make a deployment configuration file
 
@@ -24,6 +35,8 @@ There are four top-levels to the `deployment.yaml`
 The example script is relatively straight forward if there is no intermediate processing. See {ref}`ExProcSlocum`, below.
 
 Data comes from an input directory, and is translated into a single CF-compliant netCDF timeseries file using the package [dbdreader](https://dbdreader.readthedocs.io/en/latest/). Finally individual profiles are saved and a 2-D 1-m grid in time-depth is saved.
+
+`dbdreader` is now available on conda-forge, so it can be installed with `conda install dbdreader` or `pixi add dbdreader`. If you installed `pyglider` from PyPI with `pip`, `dbdreader` is already included as a dependency. However, the `pyglider` conda-forge package does not currently pull in `dbdreader`, so if you installed `pyglider` with `conda install -c conda-forge pyglider` or `pixi add pyglider`, you will need to install `dbdreader` separately as above.
 
 :::{note}
 There is a version that does not require `dbdreader` to do the initial conversion from the Dinkum format to netCDF. However it is quite slow, particularly for full-resolution datasets, and less robust. We suggest using the `slocum.raw_to_timeseries`.
