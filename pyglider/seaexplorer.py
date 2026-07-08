@@ -3,6 +3,8 @@
 SeaExplorer-specific processing routines.
 """
 
+# CHANGE: 6/8/2026 KB changed raw_to_rawnc function to account for RBR CTD changes 
+
 import datetime
 import glob
 import logging
@@ -171,6 +173,11 @@ def raw_to_rawnc(
                     for col_name in out.columns:
                         if 'time' not in col_name.lower():
                             out = out.with_columns(pl.col(col_name).cast(pl.Float64))
+                            # Convert Legato conductivity from mS/cm to S/m
+                    if 'LEGATO_CONDUCTIVITY' in out.columns:
+                        out = out.with_columns(
+                            (pl.col('LEGATO_CONDUCTIVITY') / 10.0).alias('LEGATO_CONDUCTIVITY')
+                        )
                     # remove leading and trailing spaces from column names
                     out = out.rename(str.strip)
                     # If AD2CP data present, convert timestamps to datetime
@@ -185,13 +192,14 @@ def raw_to_rawnc(
                     # subsetting for heavily oversampled raw data:
                     if rawsub == 'raw' and dropna_subset is not None:
                         # This check is the polars equivalent of pandas dropna. See docstring note on dropna
-                        dropna_thresh = 1  # Drop rows with more than 1 null
-                        null_exprs = [pl.col(c).is_null().cast(pl.Int64) for c in df.columns]
+                        # Check only the columns specified in dropna_subset
+                        null_exprs = [pl.col(c).is_null().cast(pl.Int64) for c in dropna_subset]
 
-                        df = df.with_columns(
-                            pl.sum(null_exprs).alias("nulls")
+                        # Apply changes to the 'out' variable, not 'df'
+                        out = out.with_columns(
+                            pl.sum_horizontal(null_exprs).alias("nulls")
                         ).filter(
-                            pl.col("nulls") <= dropna_thresh
+                            pl.col("nulls") < dropna_thresh
                         ).drop("nulls")
                     if ftype == 'gli':
                         out = out.with_columns(
@@ -273,7 +281,7 @@ def merge_parquet(indir, outdir, deploymentyaml, incremental=False, kind='raw'):
 
     metadata = deployment['metadata']
     id = metadata['glider_name']
-    outgli = outdir + '/' + id + '-rawgli.parquet'
+    outgli = outdir + '/' + id + '-' + kind + 'gli.parquet'
     outpld = outdir + '/' + id + '-' + kind + 'pld.parquet'
 
     _log.info('Opening *.gli.sub.*.parquet multi-file dataset from %s', indir)
@@ -472,8 +480,8 @@ def raw_to_timeseries(
     ncvar = deployment['netcdf_variables']
     device_data = deployment['glider_devices']
     id = metadata['glider_name']
-    _log.info(f'Opening combined nav file {indir}/{id}-rawgli.nc')
-    gli = pl.read_parquet(f'{indir}/{id}-rawgli.parquet')
+    _log.info(f'Opening combined nav file {indir}/{id}-{kind}gli.parquet')
+    gli = pl.read_parquet(f'{indir}/{id}-{kind}gli.parquet')
     _log.info(f'Opening combined payload file {indir}/{id}-{kind}pld.parquet')
     sensor = pl.read_parquet(f'{indir}/{id}-{kind}pld.parquet')
     sensor = _remove_fill_values(sensor)
